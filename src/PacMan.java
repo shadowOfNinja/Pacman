@@ -145,6 +145,7 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
     int highScore = 0;
     int lives = 3;
     boolean gameOver = false;
+    char desiredDirection = ' ';
 
     PacMan() {
         setPreferredSize(new Dimension(boardWidth, boardHeight));
@@ -235,6 +236,14 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
     }
 
     public void move() {
+        // Try to apply the desired direction from the buffer
+        if (desiredDirection != ' ') {
+            pacman.updateDirection(desiredDirection);
+            if (pacman.direction == desiredDirection) {
+                desiredDirection = ' '; // Clear the buffer if the direction was applied
+            }
+        }
+        
         pacman.x += pacman.velocityX;
         pacman.y += pacman.velocityY;
 
@@ -319,6 +328,15 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
             resetPositions();
             lives += 1; // Extra life for completing the level
             score += 100; // Bonus points for completing the level
+
+            //pause the game loop to show the level completion
+            gameLoop.stop();
+            try {
+                Thread.sleep(5000); // Pause for 3 seconds
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            gameLoop.start();
         }
 
         // Update high score
@@ -357,12 +375,12 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
     }
 
     @Override
-    public void keyPressed(KeyEvent e) {
+    public void keyReleased(KeyEvent e) {
         // TODO Auto-generated method stub
     }
 
     @Override
-    public void keyReleased(KeyEvent e) {
+    public void keyPressed(KeyEvent e) {
         if (gameOver) {
             loadMap();
             resetPositions();
@@ -372,20 +390,21 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
             gameLoop.start();
         }
         
+        // Get key presses and set the desired direction in the buffer
         switch (e.getKeyCode()) {
             case KeyEvent.VK_UP:
-                pacman.updateDirection('U');
+                desiredDirection = 'U';
                 break;
             case KeyEvent.VK_DOWN:
-                pacman.updateDirection('D');
+                desiredDirection = 'D';
                 break;
             case KeyEvent.VK_LEFT:
-                pacman.updateDirection('L');
+                desiredDirection = 'L';
                 break;
             case KeyEvent.VK_RIGHT:
-                pacman.updateDirection('R');
+                desiredDirection = 'R';
                 break;
-            case KeyEvent.VK_SPACE:
+            case KeyEvent.VK_SPACE: // Space bar to pause the game
                 // Pause the game
                 if (gameLoop.isRunning()) {
                     gameLoop.stop();
@@ -404,5 +423,5 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
 // 4. Add a high score feature - DONE
 // 5. Allow player to pause the game - DONE
 // 6. Add power pellets that allow pacman to eat ghosts for a limited time
-// 7. Fix movements to be more responsive to key presses
+// 7. Fix movements to be more responsive to key presses - DONE
 //      - Could be because it's always looking at all possible spaces for collision every key release?
