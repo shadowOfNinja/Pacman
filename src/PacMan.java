@@ -127,6 +127,7 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
     char[] directions = {'U', 'D', 'L', 'R'};
     Random random = new Random();
     int score = 0;
+    int highScore = 0;
     int lives = 3;
     boolean gameOver = false;
 
@@ -214,7 +215,7 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
         if (gameOver) {
             g.drawString("Game Over! Your score: " + String.valueOf(score), tileSize/2, tileSize/2);
         } else {
-            g.drawString("x" + String.valueOf(lives) + " Score: " + String.valueOf(score), tileSize/2, tileSize/2);
+            g.drawString("x" + String.valueOf(lives) + " Score: " + String.valueOf(score) + " High Score: " + String.valueOf(highScore), tileSize/2, tileSize/2);
         }
     }
 
@@ -275,6 +276,11 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
             resetPositions();
             lives += 1; // Extra life for completing the level
             score += 100; // Bonus points for completing the level
+        }
+
+        // Update high score
+        if (score > highScore) {
+            highScore = score;
         }
     }
 
@@ -366,7 +372,7 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
 // 1. Add logic so pacman and ghost teleport when they go into the blank space
 // 2. Add movement logic specific to each ghost
 // 3. Add a new level/(s) when all the food is eaten
-// 4. Add a high score feature
+// 4. Add a high score feature - DONE
 // 5. Allow player to pause the game - DONE
 // 6. Add power pellets that allow pacman to eat ghosts for a limited time
 // 7. Fix movements to be more responsive to key presses
