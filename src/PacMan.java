@@ -31,7 +31,7 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
         void updateDirection(char direction) {
             char prevDirection = this.direction;
             this.direction = direction;
-            updateVeloccity();
+            updateVelocity();
 
             //make sure the pacman is not stuck in a wall
             this.x += this.velocityX;
@@ -41,13 +41,28 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
                     this.x -= this.velocityX;
                     this.y -= this.velocityY;
                     this.direction = prevDirection;
-                    updateVeloccity();
+                    updateVelocity();
                     break;
                 }
             }
+
+            switch (pacman.direction) {
+                case 'U':
+                    pacman.image = pacmanUpImage;
+                    break;
+                case 'D':
+                    pacman.image = pacmanDownImage;
+                    break;
+                case 'L':
+                    pacman.image = pacmanLeftImage;
+                    break;
+                case 'R':
+                    pacman.image = pacmanRightImage;
+                    break;
+            }
         }
 
-        void updateVeloccity() {
+        void updateVelocity() {
             switch (this.direction) {
                 case 'U':
                     this.velocityX = 0;
@@ -232,10 +247,29 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
             }
         }
 
+        // Check if pacman goes off screen
+        if (pacman.x < 0 && pacman.velocityX < 0) {
+            // Teleport pacman to the right side of the screen
+            pacman.x = boardWidth - pacman.width;
+        } else if (pacman.x > boardWidth - pacman.width && pacman.velocityX > 0) {
+            // Teleport pacman to the left side of the screen
+            pacman.x = 0;
+        }
+
         // update ghost directions
         for (Block ghost : ghosts) {
             if (collision(pacman, ghost)) {
                 lives--;
+                
+                // Brielfy stop the game loop to show the collision
+                gameLoop.stop();
+                try {
+                    Thread.sleep(3000); // Pause for 3 seconds
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                gameLoop.start();
+
                 resetPositions();
                 if (lives == 0) {
                     gameOver = true;
@@ -251,13 +285,22 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
                     ghost.updateDirection('U');
                 }
                 // NOTE: This includes a quick fix for the two ghosts going off screen
-                if (collision(ghost, wall) || ghost.x <= 0 || ghost.x >= boardWidth - ghost.width || ghost.y <= 0 || ghost.y >= boardHeight - ghost.height) {
+                if (collision(ghost, wall)) {
                     ghost.x -= ghost.velocityX;
                     ghost.y -= ghost.velocityY;
                     char newDirection = directions[random.nextInt(directions.length)];
                     ghost.updateDirection(newDirection);
                     break;
                 }
+
+                // Check if ghost goes off screen
+                if (ghost.x < 0 && ghost.velocityX < 0) {
+                    // Teleport ghost to the right side of the screen
+                    ghost.x = boardWidth - ghost.width;
+                } else if (ghost.x > boardWidth - ghost.width && ghost.velocityX > 0) {
+                    // Teleport ghost to the left side of the screen
+                    ghost.x = 0;
+                } 
             }
         }
 
@@ -351,25 +394,11 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
                 }
         }
 
-        switch (pacman.direction) {
-            case 'U':
-                pacman.image = pacmanUpImage;
-                break;
-            case 'D':
-                pacman.image = pacmanDownImage;
-                break;
-            case 'L':
-                pacman.image = pacmanLeftImage;
-                break;
-            case 'R':
-                pacman.image = pacmanRightImage;
-                break;
-        }
     }
 }
 
 // TO DO
-// 1. Add logic so pacman and ghost teleport when they go into the blank space
+// 1. Add logic so pacman and ghost teleport when they go into the blank space - DONE
 // 2. Add movement logic specific to each ghost
 // 3. Add a new level/(s) when all the food is eaten
 // 4. Add a high score feature - DONE
