@@ -336,6 +336,13 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
             case KeyEvent.VK_RIGHT:
                 pacman.updateDirection('R');
                 break;
+            case KeyEvent.VK_SPACE:
+                // Pause the game
+                if (gameLoop.isRunning()) {
+                    gameLoop.stop();
+                } else {
+                    gameLoop.start();
+                }
         }
 
         switch (pacman.direction) {
@@ -360,6 +367,7 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
 // 2. Add movement logic specific to each ghost
 // 3. Add a new level/(s) when all the food is eaten
 // 4. Add a high score feature
-// 5. Allow player to pause the game
+// 5. Allow player to pause the game - DONE
 // 6. Add power pellets that allow pacman to eat ghosts for a limited time
 // 7. Fix movements to be more responsive to key presses
+//      - Could be because it's always looking at all possible spaces for collision every key release?
