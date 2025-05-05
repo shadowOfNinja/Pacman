@@ -1,7 +1,9 @@
 import java.awt.*;
 import java.awt.event.*;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Random;
+import java.util.List;
 import javax.swing.*;
 
 public class PacMan extends JPanel implements ActionListener, KeyListener {
@@ -18,6 +20,10 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
         int velocityX = 0;
         int velocityY = 0;
 
+        // New attributes for future position
+        int futureX;
+        int futureY;
+
         Block(Image image,int x, int y, int width, int height) {
             this.image = image;
             this.x = x;
@@ -26,9 +32,88 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
             this.height = height;
             this.startX = x;
             this.startY = y;
+
+            this.futureX = x;
+            this.futureY = y;
+        }
+
+        // Method to calculate future position
+        void calculateFuturePosition(int steps, int boardWidth, int boardHeight) {
+            // Start from the current position
+            int futureX = this.x;
+            int futureY = this.y;
+
+            // Store the last valid position
+            int lastValidX = futureX;
+            int lastValidY = futureY;
+
+            System.out.println("Current Position: " + futureX + ", " + futureY);
+
+            // Simulate movement step-by-step based on Pac-Man's dimensions
+            for (int i = 0; i < steps; i++) {
+                // Calculate the next position based on the current direction
+                switch (this.direction) {
+                    case 'U': // Moving up
+                        futureY -= this.height;
+                        break;
+                    case 'D': // Moving down
+                        futureY += this.height;
+                        break;
+                    case 'L': // Moving left
+                        futureX -= this.width;
+                        break;
+                    case 'R': // Moving right
+                        futureX += this.width;
+                        break;
+                }
+
+                // Check for collisions with walls
+                boolean collisionDetected = false;
+                for (Block wall : walls) {
+                    if (futureX < wall.x + wall.width && futureX + this.width > wall.x &&
+                        futureY < wall.y + wall.height && futureY + this.height > wall.y) {
+                        collisionDetected = true;
+                        System.out.println("Collision detected with wall at: " + wall.x + ", " + wall.y);
+                        break;
+                    }
+                }
+
+                // If a collision is detected, stop at the last valid position
+                if (collisionDetected) {
+                    futureX = lastValidX;
+                    futureY = lastValidY;
+                    break;
+                }
+
+                // Update the last valid position
+                lastValidX = futureX;
+                lastValidY = futureY;
+
+                // Wrap around the board if Pac-Man goes off-screen
+                if (futureX < 0) {
+                    futureX = boardWidth - this.width;
+                } else if (futureX >= boardWidth) {
+                    futureX = 0;
+                }
+                if (futureY < 0) {
+                    futureY = boardHeight - this.height;
+                } else if (futureY >= boardHeight) {
+                    futureY = 0;
+                }
+            }
+
+            // Update the future position
+            this.futureX = futureX;
+            this.futureY = futureY;
+
+            System.out.println("Future Position: " + this.futureX + ", " + this.futureY);
         }
 
         void updateDirection(char direction) {
+            if (this.direction == direction) {
+                return; // No change in direction
+            }
+            
             char prevDirection = this.direction;
             this.direction = direction;
             updateVelocity();
@@ -63,21 +148,28 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
         }
 
         void updateVelocity() {
+            int speed = tileSize / 4; // Speed of pacman and ghosts             
+            
+            // Match speed for ghosts
+            if (this instanceof Ghost) {
+                speed = Math.max(Math.abs(pacman.velocityX), Math.abs(pacman.velocityY)); // Match Pacman's speed
+            }
+            
             switch (this.direction) {
                 case 'U':
                     this.velocityX = 0;
-                    this.velocityY = -tileSize/4;
+                    this.velocityY = -speed;
                     break;
                 case 'D':
                     this.velocityX = 0;
-                    this.velocityY = tileSize/4;
+                    this.velocityY = speed;
                     break;
                 case 'L':
-                    this.velocityX = -tileSize/4;
+                    this.velocityX = -speed;
                     this.velocityY = 0;
                     break;
                 case 'R':
-                    this.velocityX = tileSize/4;
+                    this.velocityX = speed;
                     this.velocityY = 0;
                     break;
             }
@@ -88,7 +180,39 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
             this.y = startY;
         }
     }
+
+    class Ghost extends Block {
+        String behaviour; 
+        long lastPathUpdateTime;
+        List<Node> path;
+        int targetX;
+        int targetY;
+
+        Ghost (Image image, int x, int y, int width, int height, String behaviour) {
+            super(image, x, y, width, height);
+            this.behaviour = behaviour;
+            this.lastPathUpdateTime = 0;
+            this.targetX = -1;
+            this.targetY = -1;
+        }
+    }
+
+    class Node {
+        int x, y;
+        int gCost, hCost, fCost;
+        Node parent;
     
+        Node(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+    
+        void calculateCosts(Node target, int gCostFromStart) {
+            this.gCost = gCostFromStart;
+            this.hCost = Math.abs(target.x - this.x) + Math.abs(target.y - this.y); // Manhattan distance
+            this.fCost = this.gCost + this.hCost;
+        }
+    }
     
     private int rowCount = 21;
     private int columnCount = 19;
@@ -135,7 +259,7 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
 
     HashSet<Block> walls;
     HashSet<Block> foods;
-    HashSet<Block> ghosts;
+    HashSet<Ghost> ghosts;
     Block pacman;
 
     Timer gameLoop;
@@ -167,7 +291,7 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
 
         // Load map
         loadMap();
-        for (Block ghost : ghosts) {
+        for (Ghost ghost : ghosts) {
             char newDirection = directions[random.nextInt(directions.length)];
             ghost.updateDirection(newDirection);
         }
@@ -178,7 +302,7 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
     public void loadMap() {
         walls = new HashSet<Block>();
         foods = new HashSet<Block>();
-        ghosts = new HashSet<Block>();
+        ghosts = new HashSet<Ghost>();
         for (int row = 0; row < rowCount; row++) {
             for (int col = 0; col < columnCount; col++) {
                 String rowString = tileMap[row];
@@ -193,13 +317,13 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
                 } else if (tileMapChar == 'P') {
                     pacman = new Block(pacmanRightImage, x, y, tileSize, tileSize);
                 } else if (tileMapChar == 'b') {
-                    ghosts.add(new Block(blueGhostImage, x, y, tileSize, tileSize));
+                    ghosts.add(new Ghost(blueGhostImage, x, y, tileSize, tileSize, "scatter"));
                 } else if (tileMapChar == 'o') {
-                    ghosts.add(new Block(orangeGhostImage, x, y, tileSize, tileSize));
+                    ghosts.add(new Ghost(orangeGhostImage, x, y, tileSize, tileSize, "scatter"));
                 } else if (tileMapChar == 'p') {
-                    ghosts.add(new Block(pinkGhostImage, x, y, tileSize, tileSize));
+                    ghosts.add(new Ghost(pinkGhostImage, x, y, tileSize, tileSize, "ambusher"));
                 } else if (tileMapChar == 'r') {
-                    ghosts.add(new Block(redGhostImage, x, y, tileSize, tileSize));
+                    ghosts.add(new Ghost(redGhostImage, x, y, tileSize, tileSize, "chaser"));
                 }
             }
         }
@@ -213,8 +337,49 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
     public void draw(Graphics g) {
         g.drawImage(pacman.image, pacman.x, pacman.y, pacman.width, pacman.height, null);
 
-        for (Block ghost : ghosts) {
+        // if pacman's future position is not the same as the current position, draw it
+        if (pacman.futureX != pacman.x || pacman.futureY != pacman.y) {
+            g.setColor(Color.PINK);
+            g.fillRect(pacman.futureX, pacman.futureY, pacman.width, pacman.height);
+        }
+
+        for (Ghost ghost : ghosts) {
             g.drawImage(ghost.image, ghost.x, ghost.y, ghost.width, ghost.height, null);
+
+            // Draw the chaser's path
+            if (ghost.behaviour.equals("chaser")) {
+                if (ghost.path != null) {
+                    g.setColor(Color.RED);
+                    for (int i = 0; i < ghost.path.size() - 1; i++) {
+                        Node current = ghost.path.get(i);
+                        Node next = ghost.path.get(i + 1);
+                        int x1 = current.x * tileSize + tileSize / 2;
+                        int y1 = current.y * tileSize + tileSize / 2;
+                        int x2 = next.x * tileSize + tileSize / 2;
+                        int y2 = next.y * tileSize + tileSize / 2;
+                        g.drawLine(x1, y1, x2, y2);
+                    }
+                } else {
+                    System.out.println("No path found from red ghost to pacman.");
+                }
+            }
+            // Draw the amusher's path
+            if (ghost.behaviour.equals("ambusher")) {
+                if (ghost.path != null) {
+                    g.setColor(Color.PINK);
+                    for (int i = 0; i < ghost.path.size() - 1; i++) {
+                        Node current = ghost.path.get(i);
+                        Node next = ghost.path.get(i + 1);
+                        int x1 = current.x * tileSize + tileSize / 2;
+                        int y1 = current.y * tileSize + tileSize / 2;
+                        int x2 = next.x * tileSize + tileSize / 2;
+                        int y2 = next.y * tileSize + tileSize / 2;
+                        g.drawLine(x1, y1, x2, y2);
+                    }
+                } else {
+                    System.out.println("No path found from pink ghost to pacman.");
+                }
+            }
         }
 
         for (Block wall : walls) {
@@ -247,6 +412,9 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
         pacman.x += pacman.velocityX;
         pacman.y += pacman.velocityY;
 
+        // Update Pac-Man's future position
+        pacman.calculateFuturePosition(3, boardWidth, boardHeight);
+
         // Check for collision with walls
         for (Block wall : walls) {
             if (collision(pacman, wall)) {
@@ -266,7 +434,10 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
         }
 
         // update ghost directions
-        for (Block ghost : ghosts) {
+        for (Ghost ghost : ghosts) {
+            // Update the ghost's velocity to match Pac-Man's speed
+            ghost.updateVelocity();
+            
             if (collision(pacman, ghost)) {
                 lives--;
                 
@@ -284,6 +455,27 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
                     gameOver = true;
                 }
             }
+
+            // Update ghost direction based on its behaviour
+            switch (ghost.behaviour) {
+                case "chaser":
+                    moveTowardPacman(ghost);
+                    break;
+                case "ambusher":
+                    moveTowardPacmanFuturePosition(ghost);
+                    break;
+                /*case "random":
+                    moveRandomly(ghost);
+                    break;
+                case "scatter":
+                    moveTowardCorner(ghost);
+                    break;*/
+                default:
+                    break;
+            }
+
+            movetoNextStep(ghost);
+
             ghost.x += ghost.velocityX;
             ghost.y += ghost.velocityY;
 
@@ -295,11 +487,11 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
                 }
                 // NOTE: This includes a quick fix for the two ghosts going off screen
                 if (collision(ghost, wall)) {
-                    ghost.x -= ghost.velocityX;
-                    ghost.y -= ghost.velocityY;
-                    char newDirection = directions[random.nextInt(directions.length)];
-                    ghost.updateDirection(newDirection);
-                    break;
+                        ghost.x -= ghost.velocityX;
+                        ghost.y -= ghost.velocityY;
+                        char newDirection = directions[random.nextInt(directions.length)];
+                        ghost.updateDirection(newDirection);
+                        break;
                 }
 
                 // Check if ghost goes off screen
@@ -345,12 +537,120 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
         }
     }
 
+    private void moveTowardPacman(PacMan.Ghost ghost) {
+        System.out.println("Chaser calculating path to pacman...");
+        // Calculate Pac-Man's current position on the grid
+        int pacmanGridX = pacman.x / tileSize;
+        int pacmanGridY = pacman.y / tileSize;
+    
+        // Check if the ghost's target has changed
+        if (ghost.targetX != pacmanGridX || ghost.targetY != pacmanGridY) {
+            // Update the path
+            System.out.println("Calculating path from " + ghost.x + ", " + ghost.y + " to " + pacman.futureX + ", " + pacman.futureY);
+            ghost.path = findPath(ghost.x, ghost.y, pacman.x, pacman.y);
+    
+            // Update the target position
+            ghost.targetX = pacmanGridX;
+            ghost.targetY = pacmanGridY;
+        }
+    
+        // DUPLICATE OF movetoNextStep() - could be refactored, but seems to work better here
+        // If a path exists, move toward the next step
+        if (ghost.path != null && !ghost.path.isEmpty()) {
+            Node nextStep = ghost.path.get(0);
+            int targetX = nextStep.x * tileSize;
+            int targetY = nextStep.y * tileSize;
+    
+            if (targetX > ghost.x) {
+                ghost.updateDirection('R');
+            } else if (targetX < ghost.x) {
+                ghost.updateDirection('L');
+            } else if (targetY > ghost.y) {
+                ghost.updateDirection('D');
+            } else if (targetY < ghost.y) {
+                ghost.updateDirection('U');
+            }
+    
+            // Remove the step once the ghost reaches it
+            if (ghost.x == targetX && ghost.y == targetY) {
+                ghost.path.remove(0);
+            }
+        }
+        System.out.println("Chaser calculation: done!");
+    }
+
+    private void moveTowardPacmanFuturePosition(PacMan.Ghost ghost) {
+        System.out.println("Ambusher calculating path to pacman...");
+        // Convert Pac-Man's future position to grid coordinates
+        int pacmanFutureGridX = pacman.futureX / tileSize;
+        int pacmanFutureGridY = pacman.futureY / tileSize;
+    
+        // Check if the ghost's target has changed
+        if (ghost.targetX != pacmanFutureGridX || ghost.targetY != pacmanFutureGridY) {
+            // Update the path
+            System.out.println("Calculating path from " + ghost.x + ", " + ghost.y + " to " + pacman.futureX + ", " + pacman.futureY);
+            ghost.path = findPath(ghost.x, ghost.y, pacman.futureX, pacman.futureY);
+    
+            // Update the target position
+            ghost.targetX = pacmanFutureGridX;
+            ghost.targetY = pacmanFutureGridY;
+        }
+    
+        // DUPLICATE OF movetoNextStep() - could be refactored, but seems to work better here
+        // If a path exists, move toward the next step
+        if (ghost.path != null && !ghost.path.isEmpty()) {
+            Node nextStep = ghost.path.get(0);
+            int targetX = nextStep.x * tileSize;
+            int targetY = nextStep.y * tileSize;
+    
+            if (targetX > ghost.x) {
+                ghost.updateDirection('R');
+            } else if (targetX < ghost.x) {
+                ghost.updateDirection('L');
+            } else if (targetY > ghost.y) {
+                ghost.updateDirection('D');
+            } else if (targetY < ghost.y) {
+                ghost.updateDirection('U');
+            }
+    
+            // Remove the step once the ghost reaches it
+            if (ghost.x == targetX && ghost.y == targetY) {
+                ghost.path.remove(0);
+            }
+        }
+        System.out.println("Ambusher calculation: done!");
+    }
+
+    private void movetoNextStep(PacMan.Ghost ghost) {
+        // Calculate the next step in the path
+        if (ghost.path != null && !ghost.path.isEmpty()) {
+            Node nextStep = ghost.path.get(0); // Get the next step in the path
+            int targetX = nextStep.x * tileSize;
+            int targetY = nextStep.y * tileSize;
+
+            if (targetX > ghost.x) {
+                ghost.updateDirection('R');
+            } else if (targetX < ghost.x) {
+                ghost.updateDirection('L');
+            } else if (targetY > ghost.y) {
+                ghost.updateDirection('D');
+            } else if (targetY < ghost.y) {
+                ghost.updateDirection('U');
+            }
+
+            // Remove the step once the ghost reaches it
+            if (ghost.x == targetX && ghost.y == targetY) {
+                ghost.path.remove(0);
+            }
+        }
+    }
+
     public boolean collision(Block a, Block b) {
         return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
     }
 
     public void resetPositions() {
-        for (Block ghost : ghosts) {
+        for (Ghost ghost : ghosts) {
             ghost.reset();
             char newDirection = directions[random.nextInt(directions.length)];
             ghost.updateDirection(newDirection);
@@ -358,6 +658,98 @@ public class PacMan extends JPanel implements ActionListener, KeyListener {
         pacman.reset();
         pacman.velocityX = 0;
         pacman.velocityY = 0;
+    }
+
+    // A* pathfinding algorithm to find the path from the ghost to target coordinates
+    public List<Node> findPath(int startX, int startY, int targetX, int targetY) {
+        boolean[][] walkable = new boolean[rowCount][columnCount];
+        
+        for (int row = 0; row < rowCount; row++) {
+            for (int col = 0; col < columnCount; col++) {
+                walkable[row][col] = true; // Default all tiles to walkable
+            }
+        }
+        for (Block wall : walls) {
+            walkable[wall.y / tileSize][wall.x / tileSize] = false; // Mark walls as non-walkable
+        }
+
+        if (startX < 0 || startY < 0 || startX >= boardWidth || startY >= boardHeight ||
+        targetX < 0 || targetY < 0 || targetX >= boardWidth || targetY >= boardHeight) {
+        System.out.println("Invalid start or target position.");
+        return null;
+        }
+
+        if (!walkable[startY / tileSize][startX / tileSize] || !walkable[targetY / tileSize][targetX / tileSize]) {
+            System.out.println("Start or target position is not walkable.");
+            return null;
+        }
+
+        Node startNode = new Node(startX / tileSize, startY / tileSize);
+        Node targetNode = new Node(targetX / tileSize, targetY / tileSize);
+
+        List<Node> openList = new ArrayList<>();
+        List<Node> closedList = new ArrayList<>();
+        openList.add(startNode);
+
+        int maxIterations = rowCount * columnCount;
+        int iterations = 0;
+
+        while (!openList.isEmpty()) {
+            iterations++;
+            if (iterations > maxIterations) {
+                System.out.println("Pathfinding exceeded maximum iterations.");
+                return null; // Pathfinding failed
+            }
+
+            Node currentNode = openList.get(0);
+            for (Node node : openList) {
+                if (node.fCost < currentNode.fCost || (node.fCost == currentNode.fCost && node.hCost < currentNode.hCost)) {
+                    currentNode = node;
+                }
+            }
+
+            openList.remove(currentNode);
+            closedList.add(currentNode);
+
+            if (currentNode.x == targetNode.x && currentNode.y == targetNode.y) {
+                return reconstructPath(currentNode);
+            }
+
+            for (int[] direction : new int[][]{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}) {
+                int neighborX = currentNode.x + direction[0];
+                int neighborY = currentNode.y + direction[1];
+
+                if (neighborX < 0 || neighborY < 0 || neighborX >= columnCount || neighborY >= rowCount || !walkable[neighborY][neighborX]) {
+                    continue;
+                }
+
+                Node neighbor = new Node(neighborX, neighborY);
+                if (closedList.contains(neighbor)) {
+                    continue;
+                }
+
+                int gCostFromStart = currentNode.gCost + 1;
+                if (!openList.contains(neighbor)) {
+                    neighbor.calculateCosts(targetNode, gCostFromStart);
+                    neighbor.parent = currentNode;
+                    openList.add(neighbor);
+                } else if (gCostFromStart < neighbor.gCost) {
+                    neighbor.calculateCosts(targetNode, gCostFromStart);
+                    neighbor.parent = currentNode;
+                }
+            }
+        }
+
+        return null; // No path found
+    }
+
+    private List<Node> reconstructPath(Node currentNode) {
+        List<Node> path = new ArrayList<>();
+        while (currentNode != null) {
+            path.add(0, currentNode);
+            currentNode = currentNode.parent;
+        }
+        return path;
     }
 
     @Override
